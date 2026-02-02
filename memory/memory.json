@@ -1,0 +1,35 @@
+{
+  "identity": {
+
+    },
+    "user_name": {
+      "value": "Lorenzo"
+    
+  },
+  "preferences": {
+    "favorite_food": {
+      "value": "pasta alla carbonara"
+    }
+  },
+  "relationships": {},
+  "emotional_state": {
+    "mood": {
+      "value": "allegro"
+    },
+    "energy_level": {
+      "value": "alto"
+    },
+    "emotion_mood": {
+      "value": "allegro"
+    },
+    "emotion_energy_level": {
+      "value": "alto"
+    },
+    "language_preference": {
+      "value": "Italian"
+    }
+  },
+  "recent_conversation": {
+    "value": "User: ciao come stai"
+  }
+}
