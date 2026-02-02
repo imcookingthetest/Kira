@@ -94,7 +94,7 @@ class JarvisUI:
         return img.filter(ImageFilter.GaussianBlur(30))
 
     def _create_thinking_halo(self, size, radius, y_offset):
-        """Create orange halo for thinking state."""
+        """Create pink halo for thinking state."""
         w, h = size
         img = Image.new("RGBA", size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
@@ -106,7 +106,7 @@ class JarvisUI:
             alpha = int(70 * (1 - r / radius))
             draw.ellipse(
                 (cx - r, cy - r, cx + r, cy + r),
-                fill=(255, 150, 0, alpha)  # Orange color
+                fill=(255, 105, 180, alpha)  # Rosa (Hot Pink)
             )
 
         return img.filter(ImageFilter.GaussianBlur(30))
@@ -163,7 +163,7 @@ class JarvisUI:
                 self.target_scale = random.uniform(1.02, 1.1)
                 self.target_halo_alpha = random.randint(120, 150)
             elif self.thinking:
-                # Thinking animation: pulsing orange halo
+                # Thinking animation: pulsing pink halo
                 self.target_scale = random.uniform(1.008, 1.025)
                 self.target_halo_alpha = random.randint(90, 110)
             else:
@@ -180,7 +180,7 @@ class JarvisUI:
 
         frame = Image.new("RGBA", self.size, (0, 0, 0, 255))
 
-        # Change halo color when thinking (orange tint)
+        # Change halo color when thinking (pink tint)
         if self.thinking:
             halo = self._create_thinking_halo(self.size, radius=220, y_offset=-50)
         else:

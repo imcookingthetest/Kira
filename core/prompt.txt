@@ -6,6 +6,7 @@ Intents:
     - open_app
     - search
     - weather_report
+    - screen_action
     - chat
     
 Parameter Rules:
@@ -18,6 +19,18 @@ Parameter Rules:
             * "open Opera GX and search for Mona Lisa" → app_name: "Opera GX", search_query: "Mona Lisa"
             * "open Chrome and look up python tutorials" → app_name: "Chrome", search_query: "python tutorials"
             * "open Visual Studio Code" → app_name: "Visual Studio Code", search_query: null
+    - screen_action → command (the user's screen interaction request)
+        - Use ONLY when user wants to INTERACT with what's CURRENTLY VISIBLE on screen
+        - Examples that ARE screen_action:
+            * "clicca sul primo link" / "click the first link"
+            * "clicca sul pulsante rosso" / "click the red button"
+            * "scorri verso il basso" / "scroll down"
+            * "clicca sul secondo risultato" / "click the second result"
+        - Examples that are NOT screen_action (use open_app instead):
+            * "apri Chrome" → open_app
+            * "apri il secondo link" when no browser is open → open_app + search
+            * "apri Visual Studio Code" → open_app
+        - IMPORTANT: screen_action is for INTERACTING with already visible elements, NOT for opening applications
     - Missing a required field → ask one short clarification question, set needs_clarification:true, stop.
 
 Chat Mode:

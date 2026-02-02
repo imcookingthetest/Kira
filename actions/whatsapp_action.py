@@ -213,10 +213,77 @@ def send_whatsapp_message(contact_name: str, message: str, player):
         edge_speak(text, player)
 
 
-def handle_whatsapp_command(user_text, player):
+def handle_whatsapp_command(user_text, player, temp_memory=None):
     """Main handler for WhatsApp commands"""
     global whatsapp_state
     
+    # Se abbiamo temp_memory, usiamo quello invece dello stato globale
+    if temp_memory:
+        # Check if we're waiting for a contact name
+        if temp_memory.is_waiting_for_whatsapp_contact():
+            # User is providing the contact name
+            contact_name = extract_contact_name(user_text)
+            
+            # Se non troviamo il contatto nel testo formattato, proviamo il testo grezzo
+            if not contact_name:
+                normalized = normalize(user_text)
+                # Controlla se il testo è proprio un nome di contatto
+                for contact in CONTACTS.keys():
+                    if normalized == contact or normalized in contact or contact in normalized:
+                        contact_name = contact
+                        break
+            
+            if contact_name:
+                # Trovato il contatto, chiediamo il messaggio
+                temp_memory.set_waiting_for_whatsapp_message(contact_name)
+                temp_memory.set_waiting_for_whatsapp_contact(False)
+                text = f"Perfetto! Cosa vuoi inviare a {contact_name.title()}?"
+                if player:
+                    player.write_log(text)
+                edge_speak(text, player)
+                return True
+            else:
+                # Contatto non trovato
+                text = f"Non riesco a trovare '{user_text}' nei tuoi contatti. {list_available_contacts()}"
+                if player:
+                    player.write_log(text)
+                edge_speak(text, player)
+                return True
+        
+        # Check if we're waiting for message content
+        if temp_memory.is_waiting_for_whatsapp_message():
+            contact_name = temp_memory.get_whatsapp_target_contact()
+            user_input = user_text.strip().lower()
+            
+            # Check if user is just repeating the contact name
+            is_just_contact_name = False
+            cleaned_input = user_input
+            for prefix in ["a ", "per ", "si ", "sì ", "ok ", "yes "]:
+                if cleaned_input.startswith(prefix):
+                    cleaned_input = cleaned_input[len(prefix):]
+            
+            if cleaned_input == contact_name or cleaned_input in contact_name or contact_name in cleaned_input:
+                if len(user_input.split()) <= 3:
+                    is_just_contact_name = True
+            
+            if is_just_contact_name:
+                text = f"Hai già specificato {contact_name.title()} come destinatario. Dimmi il messaggio che vuoi inviargli."
+                if player:
+                    player.write_log(text)
+                edge_speak(text, player)
+                return True
+            
+            # Input is the actual message
+            message = user_text.strip()
+            
+            # Reset state
+            temp_memory.clear_whatsapp_state()
+            
+            # Send the message
+            send_whatsapp_message(contact_name, message, player)
+            return True
+    
+    # Fallback al vecchio sistema globale
     # Check if we're waiting for message content (2-step process)
     if whatsapp_state["waiting_for_message"]:
         contact_name = whatsapp_state["contact_name"]
@@ -347,7 +414,10 @@ def handle_whatsapp_command(user_text, player):
         
         # If no contact found at all
         if not contact_name:
-            text = f"Per favore specifica a chi vuoi inviare il messaggio. {list_available_contacts()}"
+            # Se abbiamo temp_memory, impostiamo lo stato di attesa contatto
+            if temp_memory:
+                temp_memory.set_waiting_for_whatsapp_contact(True)
+            text = f"Per favore specifica un contatto. {list_available_contacts()}"
             if player:
                 player.write_log(text)
             edge_speak(text, player)

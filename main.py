@@ -15,7 +15,7 @@ from actions.open_app import open_app
 from actions.web_search import web_search
 from actions.weather_report import weather_action
 from actions.whatsapp_action import handle_whatsapp_command
-# from actions.screen_action import screen_action  # DISABLED - Vision API issues  
+from actions.screen_action import screen_action  
 
 from memory.memory_manager import load_memory, update_memory
 from memory.temporary_memory import TemporaryMemory
@@ -45,7 +45,7 @@ async def ai_loop(ui: JarvisUI):
             continue
 
         # Check for WhatsApp commands (direct handling, bypasses LLM)
-        if handle_whatsapp_command(user_text, ui):
+        if handle_whatsapp_command(user_text, ui, temp_memory):
             continue
 
         ui.write_log(f"You: {user_text}")
@@ -167,19 +167,18 @@ async def ai_loop(ui: JarvisUI):
                 ui.write_log(f"AI: {response}")
                 edge_speak(response, ui)
 
-        # DISABLED - Vision API issues
-        # elif intent == "screen_action":
-        #     command = parameters.get("command")
-        #     if command:
-        #         await asyncio.to_thread(
-        #             screen_action,
-        #             parameters=parameters,
-        #             player=ui,
-        #             session_memory=temp_memory
-        #         )
-        #     elif response:
-        #         ui.write_log(f"AI: {response}")
-        #         edge_speak(response, ui)
+        elif intent == "screen_action":
+            command = parameters.get("command")
+            if command:
+                await asyncio.to_thread(
+                    screen_action,
+                    parameters=parameters,
+                    player=ui,
+                    session_memory=temp_memory
+                )
+            elif response:
+                ui.write_log(f"AI: {response}")
+                edge_speak(response, ui)
 
         else:
             if response:

@@ -31,6 +31,11 @@ class TemporaryMemory:
         # --- Action memory ---
         self.last_search: dict | None = None   
         self.last_opened_app: str | None = None
+        
+        # --- WhatsApp state ---
+        self.waiting_for_whatsapp_contact: bool = False
+        self.waiting_for_whatsapp_message: bool = False
+        self.whatsapp_target_contact: str | None = None
 
         # --- Conversation ---
         self.conversation_history: list[dict[str, str]] = []
@@ -99,6 +104,33 @@ class TemporaryMemory:
 
     def get_last_opened_app(self):
         return self.last_opened_app
+    
+    # --- WhatsApp state methods ---
+    def set_waiting_for_whatsapp_contact(self, waiting: bool = True):
+        self.waiting_for_whatsapp_contact = waiting
+        if waiting:
+            self.pending_intent = "send_whatsapp"
+    
+    def is_waiting_for_whatsapp_contact(self) -> bool:
+        return self.waiting_for_whatsapp_contact
+    
+    def set_waiting_for_whatsapp_message(self, contact_name: str):
+        self.waiting_for_whatsapp_message = True
+        self.whatsapp_target_contact = contact_name
+        self.pending_intent = "send_whatsapp"
+    
+    def is_waiting_for_whatsapp_message(self) -> bool:
+        return self.waiting_for_whatsapp_message
+    
+    def get_whatsapp_target_contact(self) -> str | None:
+        return self.whatsapp_target_contact
+    
+    def clear_whatsapp_state(self):
+        self.waiting_for_whatsapp_contact = False
+        self.waiting_for_whatsapp_message = False
+        self.whatsapp_target_contact = None
+        if self.pending_intent == "send_whatsapp":
+            self.clear_pending_intent()
 
     def _add_to_history(self, role: str, text: str):
         if role not in ("user", "ai"):
