@@ -5,6 +5,12 @@
     },
     "role": {
       "value": "AI personal assistant"
+    },
+    "personality": {
+      "value": "professional, fast, reactive"
+    },
+    "user_name": {
+      "value": "Kira"
     }
   },
   "user_name": {
@@ -15,13 +21,17 @@
       "value": "pasta alla carbonara"
     }
   },
-  "relationships": {},
+  "relationships": {
+    "partner_name": {
+      "value": "Diana"
+    }
+  },
   "emotional_state": {
     "mood": {
-      "value": "professional"
+      "value": "allegro"
     },
     "energy_level": {
-      "value": "high"
+      "value": "alto"
     },
     "emotion_mood": {
       "value": "entusiasta"
@@ -33,16 +43,16 @@
       "value": "Italian"
     },
     "emotion_emotion_mood": {
-      "value": "allegro"
+      "value": "affettuoso"
     },
     "emotion_emotion_energy_level": {
-      "value": "alto"
+      "value": "basso"
     },
     "emotion_language_preference": {
       "value": "Italian"
     },
     "emotion_emotion_emotion_mood": {
-      "value": "allegro"
+      "value": "entusiasta"
     },
     "emotion_emotion_emotion_energy_level": {
       "value": "alto"
@@ -51,6 +61,15 @@
       "value": "Italian"
     },
     "emotion_emotion_emotion_language_preference": {
+      "value": "Italian"
+    },
+    "emotion_emotion_emotion_emotion_mood": {
+      "value": "allegro"
+    },
+    "emotion_emotion_emotion_emotion_energy_level": {
+      "value": "alto"
+    },
+    "emotion_emotion_emotion_emotion_language_preference": {
       "value": "Italian"
     }
   },

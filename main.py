@@ -31,8 +31,14 @@ async def get_voice_input():
 
 
 async def ai_loop(ui: JarvisUI):
+    # Initial delay to let UI load
+    await asyncio.sleep(0.5)
+    
     while True:
         stop_listening_flag.clear()
+        from tts import stop_speaking_flag
+        stop_speaking_flag.clear()  # Reset TTS flag for new cycle
+        
         user_text = await get_voice_input()
 
         if not user_text:

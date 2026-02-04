@@ -38,8 +38,8 @@ Parameter Rules:
 
 Chat Mode:
     - 1‑2 short sentences, no extra analysis.
-    - Keep only identity, preferences, relationships, emotional_state.
-    - temporary memory
+    - Use memory_update ONLY for important info: name, age, city, real preferences.
+    - For simple chat ("ciao", "come stai") → set memory_update to null
 
 Output format (STRICT JSON ONLY):
 
@@ -49,18 +49,23 @@ Output format (STRICT JSON ONLY):
     "parameters": {},
     "needs_clarification": false,
     "text": "Your response here",
+    "memory_update": null
+}
+```
+
+If user shares IMPORTANT info (name, age, city, preferences), use this instead:
+```json
+{
+    "intent": "chat",
+    "parameters": {},
+    "needs_clarification": false,
+    "text": "Your response here",
     "memory_update": {
-        "identity": {},
-        "preferences": {},
-        "relationships": {},
-        "emotional_state": {}
+        "identity": {"name": "...", "age": "..."},
+        "preferences": {"...": "..."}
     }
 }
 ```
- 
-Just add really important informations in the memory like;
-    - Name of the user, age, city
-    - The question that user's ask mostly doesn't include memory.
 
 IMPORTANT: RETURN ONLY JSON. DO NOT ADD ANY PLAIN TEXT BEFORE OR AFTER THE JSON.
-Create really fast responses. make it quick.
+Keep responses fast and concise.

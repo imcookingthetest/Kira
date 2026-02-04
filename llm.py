@@ -10,6 +10,11 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
+# Fast models for intent classification (free):
+# - arcee-ai/trinity-large-preview:free (RELIABLE, works consistently)
+# - google/gemini-flash-1.5:free (Not available)
+# - upstage/solar-pro-3:free (Returns empty responses)
+# - stepfun/step-3.5-flash:free (Returns empty responses - DO NOT USE)
 MODEL = "arcee-ai/trinity-large-preview:free"
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -102,13 +107,13 @@ Known user memory:
 
     payload = {
         "model": MODEL,
-        "response_format": {"type": "json_object"},
+        "response_format": {"type": "json_object"},  # Re-enabled for models that support it (Gemini Flash does)
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt}
         ],
         "temperature": 0.1,  # Ridotto per risposte più deterministiche/veloci
-        "max_tokens": 200  # Ridotto da 500 a 200 per risposte più brevi e veloci
+        "max_tokens": 220  # Aumentato per evitare troncamenti JSON con memory_update
     }
 
     headers = {

@@ -73,7 +73,56 @@ Kira AI è costruito con un'architettura modulare che separa chiaramente le dive
 
 - Python 3.11 o superiore
 - Sistema operativo Windows
-- Librerie Python (gestite tramite requirements.txt)
+- Modello Vosk italiano per il riconoscimento vocale
+
+## 📦 Installazione Librerie
+
+### Librerie Fondamentali
+
+Prima di avviare Kira AI, installa tutte le librerie necessarie:
+
+```bash
+pip install python-dotenv requests sounddevice vosk pyautogui pillow numpy customtkinter edge-tts pywhatkit SpeechRecognition pyaudio
+```
+
+**Librerie principali e loro utilizzo:**
+
+| Libreria | Versione Min | Scopo |
+|----------|-------------|-------|
+| `customtkinter` | 5.0+ | Interfaccia grafica moderna con dark theme |
+| `vosk` | 0.3.45+ | Riconoscimento vocale offline italiano |
+| `sounddevice` | 0.4.6+ | Cattura audio dal microfono |
+| `edge-tts` | 6.1+ | Sintesi vocale (Text-to-Speech) |
+| `pyautogui` | 0.9.54+ | Automazione schermo (click, scroll) |
+| `pillow` (PIL) | 10.0+ | Processing immagini per screen detection |
+| `numpy` | 1.24+ | Analisi colori per rilevamento link |
+| `requests` | 2.31+ | Chiamate API (OpenRouter, SerpAPI) |
+| `python-dotenv` | 1.0+ | Gestione variabili d'ambiente (.env) |
+| `pywhatkit` | 5.4+ | Invio messaggi WhatsApp |
+
+### Modello Vosk Italiano
+
+Scarica il modello italiano completo per il riconoscimento vocale:
+
+1. **Download**: [vosk-model-it-0.22](https://alphacephei.com/vosk/models) (~1.5GB)
+2. **Estrai** la cartella in: `C:\Users\<TuoNome>\Downloads\vosk-model-it-0.22\`
+3. **Configura** il path in `speech_to_text.py`:
+   ```python
+   MODEL_PATH = r"C:\Users\<TuoNome>\Downloads\vosk-model-it-0.22\vosk-model-it-0.22"
+   ```
+
+### File .env (Configurazione API)
+
+Crea un file `.env` nella root del progetto con le tue API keys:
+
+```env
+OPENROUTER_API_KEY=your_openrouter_key_here
+SERP_API_KEY=your_serpapi_key_here
+```
+
+**Dove ottenere le API keys:**
+- **OpenRouter**: [openrouter.ai](https://openrouter.ai) - per il modello LLM (arcee-ai/trinity-large-preview:free)
+- **SerpAPI**: [serpapi.com](https://serpapi.com) - per ricerche web (opzionale, fallback su browser)
 
 ## 📋 Limitazioni d'Uso
 
