@@ -1,10 +1,14 @@
 {
   "identity": {
-
+    "name": {
+      "value": "Kira"
     },
-    "user_name": {
-      "value": "Lorenzo"
-    
+    "role": {
+      "value": "AI personal assistant"
+    }
+  },
+  "user_name": {
+    "value": "Lorenzo"
   },
   "preferences": {
     "favorite_food": {
@@ -14,18 +18,39 @@
   "relationships": {},
   "emotional_state": {
     "mood": {
-      "value": "allegro"
+      "value": "professional"
     },
     "energy_level": {
-      "value": "alto"
+      "value": "high"
     },
     "emotion_mood": {
-      "value": "allegro"
+      "value": "entusiasta"
     },
     "emotion_energy_level": {
       "value": "alto"
     },
     "language_preference": {
+      "value": "Italian"
+    },
+    "emotion_emotion_mood": {
+      "value": "allegro"
+    },
+    "emotion_emotion_energy_level": {
+      "value": "alto"
+    },
+    "emotion_language_preference": {
+      "value": "Italian"
+    },
+    "emotion_emotion_emotion_mood": {
+      "value": "allegro"
+    },
+    "emotion_emotion_emotion_energy_level": {
+      "value": "alto"
+    },
+    "emotion_emotion_language_preference": {
+      "value": "Italian"
+    },
+    "emotion_emotion_emotion_language_preference": {
       "value": "Italian"
     }
   },

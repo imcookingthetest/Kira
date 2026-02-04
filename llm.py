@@ -57,8 +57,16 @@ def safe_json_parse(text: str) -> dict | None:
         return json.loads(json_str)
     except Exception as e:
         print(f"⚠️ JSON parse error: {e}")
-        print(f"The error text: {text[:200]}")
-        return None
+        print(f"The error text: {text[:400]}")
+        
+        # Fallback: Return a valid chat response when JSON parsing fails
+        return {
+            "intent": "chat",
+            "parameters": {},
+            "needs_clarification": False,
+            "text": "Ho capito, Sir.",
+            "memory_update": None
+        }
 
 
 def get_llm_output(user_text: str, memory_block: dict = None) -> dict:

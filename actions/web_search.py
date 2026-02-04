@@ -119,7 +119,8 @@ def serpapi_answer(query: str, api_key: str) -> str:
     organic = data.get("organic_results", [])
     if not organic:
         print(f"DEBUG: No organic results found. Data keys: {data.keys()}")
-        return "Sir, I couldn't find relevant information."
+        # Fallback: return special marker to trigger browser search
+        return None  # This will trigger browser fallback in web_search()
 
     snippets = [
         r.get("snippet", "")
@@ -166,6 +167,18 @@ def web_search(
         return msg
 
     answer = serpapi_answer(query, api_key)
+    
+    # If API search fails or returns no results, open browser instead
+    if not answer:
+        import webbrowser
+        import urllib.parse
+        search_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+        webbrowser.open(search_url)
+        msg = f"Ho aperto la ricerca nel browser, Sir."
+        if player:
+            player.write_log(msg)
+        edge_speak(msg)
+        return msg
 
     if player:
         player.write_log(f"AI: {answer}")

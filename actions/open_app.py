@@ -24,8 +24,8 @@ def open_app(
         - No long-term memory writes
     """
 
-    app_name = (parameters or {}).get("app_name", "").strip()
-    search_query = (parameters or {}).get("search_query", "").strip()
+    app_name = ((parameters or {}).get("app_name") or "").strip()
+    search_query = ((parameters or {}).get("search_query") or "").strip()
 
     if not app_name and session_memory:
         app_name = session_memory.open_app or ""

@@ -24,13 +24,16 @@ Parameter Rules:
         - Examples that ARE screen_action:
             * "clicca sul primo link" / "click the first link"
             * "clicca sul pulsante rosso" / "click the red button"
-            * "scorri verso il basso" / "scroll down"
+            * "scorri verso il basso" / "scroll down" / "scorri giù" / "scendi"
+            * "scorri verso l'alto" / "scroll up" / "scorri su" / "sali"
             * "clicca sul secondo risultato" / "click the second result"
+            * "scrivi nel campo" / "type in the field"
         - Examples that are NOT screen_action (use open_app instead):
             * "apri Chrome" → open_app
             * "apri il secondo link" when no browser is open → open_app + search
             * "apri Visual Studio Code" → open_app
         - IMPORTANT: screen_action is for INTERACTING with already visible elements, NOT for opening applications
+        - CRITICAL: ANY scroll command (scorri giù, scorri su, scroll down, scroll up, scendi, sali) is ALWAYS screen_action!
     - Missing a required field → ask one short clarification question, set needs_clarification:true, stop.
 
 Chat Mode:

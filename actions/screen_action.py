@@ -1,11 +1,12 @@
 # Screen action feature - Vision-powered screen interaction
-# Uses OpenRouter vision model for screen analysis
+# Uses OCR + pattern matching for reliable link detection
 
 import pyautogui
 import base64
 import io
 import os
 import requests
+import re
 from PIL import Image
 from dotenv import load_dotenv
 from tts import edge_speak
@@ -14,7 +15,22 @@ load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-VISION_MODEL = "google/gemma-3-4b-it:free"
+VISION_MODEL = "google/gemma-3-12b-it:free"
+
+
+# Try to import OCR libraries
+try:
+    import pytesseract
+    HAS_PYTESSERACT = True
+except ImportError:
+    HAS_PYTESSERACT = False
+    print("Warning: pytesseract not installed. Install with: pip install pytesseract")
+
+try:
+    import easyocr
+    HAS_EASYOCR = True
+except ImportError:
+    HAS_EASYOCR = False
 
 
 def capture_screen() -> Image.Image:
@@ -48,6 +64,217 @@ def save_screenshot_debug(image: Image.Image, command: str):
         print(f"Warning: Could not save debug screenshot: {e}")
 
 
+def find_google_links_by_color(image: Image.Image) -> list:
+    """
+    NEW: Find Google search links using color detection.
+    Google uses specific blue color (#1a0dab) for links.
+    More reliable than vision model for coordinates.
+    """
+    import numpy as np
+    from collections import defaultdict
+    
+    img_array = np.array(image)
+    height, width = img_array.shape[:2]
+    
+    blue_pixels = []
+    color_samples = []  # DEBUG: collect color samples
+    
+    # Scan left-center area where Google results appear
+    # Expanded area to catch more links
+    for y in range(150, min(height, 800), 6):
+        for x in range(150, min(width, 800), 4):
+            try:
+                pixel = img_array[y, x]
+                # PIL/numpy uses RGB order
+                r, g, b = int(pixel[0]), int(pixel[1]), int(pixel[2])
+                
+                # DEBUG: Sample some colors
+                if len(color_samples) < 20 and y % 50 == 0 and x % 100 == 0:
+                    color_samples.append(f"({r},{g},{b})")
+                
+                # More flexible blue detection for links
+                # Allow darker blues and slight variations
+                # Typical link blues: RGB(0-80, 0-120, 150-255)
+                if r < 120 and g < 150 and b > 100 and b > r and b > g:
+                    blue_pixels.append({'x': x, 'y': y, 'color': (r, g, b)})
+            except:
+                continue
+    
+    print(f"DEBUG: Color samples from page: {color_samples[:10]}")
+    
+    if not blue_pixels:
+        return []
+    
+    # Cluster by Y coordinate (same line = same link)
+    clusters = defaultdict(list)
+    for point in blue_pixels:
+        cluster_y = (point['y'] // 25) * 25
+        clusters[cluster_y].append(point)
+    
+    # Get center of each cluster - FILTER for actual links
+    links = []
+    for cluster_y, points in clusters.items():
+        # Real Google links are LONG (many pixels) - filter out short blue text
+        if len(points) < 15:  # Increased from 5 - links have many more pixels
+            continue
+        
+        # Check cluster width (X range) - real links span wide
+        x_coords = [p['x'] for p in points]
+        y_coords = [p['y'] for p in points]
+        min_x = min(x_coords)
+        max_x = max(x_coords)
+        width = max_x - min_x
+        
+        # Real links are at least 100-150px wide, short labels are <80px
+        if width < 100:
+            continue
+        
+        # Real links are not too far left (icons/labels are around x<200)
+        avg_x = sum(x_coords) // len(x_coords)
+        if avg_x < 220:  # Too far left, probably not a link
+            continue
+        
+        # Use median Y for more accurate positioning (avg can be skewed by outliers)
+        y_coords_sorted = sorted(y_coords)
+        median_y = y_coords_sorted[len(y_coords_sorted) // 2]
+        
+        # Skip navigation bar completely (Immagini, Video, Notizie, etc.) - Y < 220
+        if median_y < 220:
+            continue
+        
+        # Get most common color in cluster
+        if points:
+            sample_color = points[0]['color']
+            links.append({'x': avg_x, 'y': median_y, 'color': sample_color, 'width': width, 'pixels': len(points)})
+    
+    # Sort top to bottom
+    links.sort(key=lambda l: l['y'])
+    
+    print(f"DEBUG Color Detection: Found {len(blue_pixels)} blue pixels in {len(links)} valid link clusters")
+    for i, link in enumerate(links[:5], 1):
+        print(f"  Link {i}: ({link['x']}, {link['y']}) RGB{link['color']} - width:{link['width']}px, pixels:{link['pixels']}")
+    
+    return links
+
+
+def extract_links_with_ocr(image: Image.Image) -> list:
+    """
+    Extract clickable links from screenshot using OCR.
+    Returns list of dicts with {text, x, y, width, height}
+    """
+    links = []
+    
+    if HAS_EASYOCR:
+        try:
+            import numpy as np
+            reader = easyocr.Reader(['en', 'it'], gpu=False)
+            
+            # Convert PIL to numpy array
+            img_array = np.array(image)
+            
+            # Extract text with bounding boxes
+            results = reader.readtext(img_array)
+            
+            # Look for patterns that indicate links
+            for (bbox, text, confidence) in results:
+                if confidence < 0.3:
+                    continue
+                
+                # Calculate center coordinates
+                top_left = bbox[0]
+                bottom_right = bbox[2]
+                x = int((top_left[0] + bottom_right[0]) / 2)
+                y = int((top_left[1] + bottom_right[1]) / 2)
+                width = int(bottom_right[0] - top_left[0])
+                height = int(bottom_right[1] - top_left[1])
+                
+                # Check if this looks like a link (has URL patterns, is blue text area, etc.)
+                is_link = (
+                    any(pattern in text.lower() for pattern in ['http', 'www', '.com', '.it', '.org']) or
+                    (len(text) > 10 and height > 15 and y > 150 and y < 600)  # Likely title text
+                )
+                
+                if is_link or len(text) > 20:  # Long text is likely a title
+                    links.append({
+                        'text': text,
+                        'x': x,
+                        'y': y,
+                        'width': width,
+                        'height': height,
+                        'confidence': confidence
+                    })
+            
+            print(f"DEBUG OCR: Found {len(links)} potential links")
+            return links
+            
+        except Exception as e:
+            print(f"EasyOCR error: {e}")
+    
+    return links
+
+
+def find_search_result_links(image: Image.Image) -> list:
+    """
+    Find Google search result links using color detection + OCR.
+    Returns list of {text, x, y} sorted from top to bottom.
+    """
+    import numpy as np
+    from collections import defaultdict
+    
+    img_array = np.array(image)
+    height, width = img_array.shape[:2]
+    
+    # Google search results are typically blue links (#1a0dab is Google's blue)
+    # Look for blue-ish pixels in the typical search result area
+    blue_links = []
+    
+    # Scan the left-center area where search results appear
+    for y in range(150, min(height, 700), 10):  # Every 10 pixels
+        for x in range(180, min(width, 650), 5):  # Left side where results are
+            pixel = img_array[y, x]
+            b, g, r = pixel[0], pixel[1], pixel[2]
+            
+            # Check if this is Google's blue color (or similar)
+            # Google blue is around RGB(26, 13, 171)
+            if r < 100 and g < 80 and b > 120:  # Blue-ish
+                blue_links.append({'x': x, 'y': y})
+    
+    # Group nearby blue pixels (likely same link)
+    if not blue_links:
+        return []
+    
+    # Cluster blue pixels by Y coordinate (same line = same link)
+    clusters = defaultdict(list)
+    for point in blue_links:
+        # Round Y to nearest 20 pixels for clustering
+        cluster_y = (point['y'] // 20) * 20
+        clusters[cluster_y].append(point)
+    
+    # Get the center of each cluster
+    result_links = []
+    for cluster_y, points in clusters.items():
+        if len(points) < 5:  # Too few points, probably not a link
+            continue
+        
+        avg_x = sum(p['x'] for p in points) // len(points)
+        avg_y = sum(p['y'] for p in points) // len(points)
+        
+        result_links.append({
+            'x': avg_x,
+            'y': avg_y,
+            'text': f'Link at y={avg_y}'
+        })
+    
+    # Sort from top to bottom
+    result_links.sort(key=lambda l: l['y'])
+    
+    print(f"DEBUG: Found {len(result_links)} blue link areas")
+    for i, link in enumerate(result_links[:5]):
+        print(f"  Link {i+1}: ({link['x']}, {link['y']})")
+    
+    return result_links
+
+
 def image_to_base64(image: Image.Image) -> str:
     """Convert PIL Image to base64 string."""
     buffered = io.BytesIO()
@@ -58,8 +285,83 @@ def image_to_base64(image: Image.Image) -> str:
 
 def analyze_screen_with_vision(image: Image.Image, user_command: str, conversation_context: str = "") -> dict:
     """
-    Send screenshot to vision model and get coordinates or instructions.
-    Returns: {"action": "click", "x": 100, "y": 200, "message": "Clicking the first link"}
+    Analyze screen for actions. 
+    NOW: Uses color detection for click commands (more reliable than vision model).
+    Direct detection for scroll (no vision model needed).
+    Vision model only for type actions.
+    """
+    
+    command_lower = user_command.lower()
+    
+    # SCROLL: Direct detection (no vision model needed!)
+    # Use only specific phrases to avoid false positives with "su" (on) or "ci" (us/there)
+    scroll_keywords_down = ['scorri giù', 'scendi', 'scroll down', 'scorri verso il basso', 'vai giù', 'pagina giù']
+    scroll_keywords_up = ['scorri su', 'sali', 'scroll up', 'scorri verso l\'alto', 'vai su', 'pagina su']
+    
+    if any(keyword in command_lower for keyword in scroll_keywords_down):
+        print("DEBUG: SCROLL DOWN detected - no vision model needed")
+        return {
+            "action": "scroll",
+            "direction": "down",
+            "amount": 300,
+            "message": "Scorro verso il basso"
+        }
+    
+    if any(keyword in command_lower for keyword in scroll_keywords_up):
+        print("DEBUG: SCROLL UP detected - no vision model needed")
+        return {
+            "action": "scroll",
+            "direction": "up",
+            "amount": 300,
+            "message": "Scorro verso l'alto"
+        }
+    
+    # CLICK: Color detection
+    if any(word in command_lower for word in ['click', 'clic', 'apri', 'link', 'primo', 'secondo', 'terzo']):
+        print("DEBUG: Click command detected - using COLOR DETECTION instead of vision model")
+        
+        # Parse which link number
+        link_number = 1
+        if 'secondo' in command_lower or 'second' in command_lower or '2' in user_command:
+            link_number = 2
+        elif 'terzo' in command_lower or 'third' in command_lower or '3' in user_command:
+            link_number = 3
+        elif 'quarto' in command_lower or '4' in user_command:
+            link_number = 4
+        
+        # Use color detection to find links
+        links = find_google_links_by_color(image)
+        
+        if links and len(links) >= link_number:
+            target = links[link_number - 1]
+            return {
+                "action": "click",
+                "x": target['x'],
+                "y": target['y'],
+                "message": f"Clicco sul {link_number}° link",
+                "debug_info": f"Color detection: link {link_number} at ({target['x']}, {target['y']})"
+            }
+        else:
+            return {
+                "action": "none",
+                "message": f"Non trovo abbastanza link. Ho trovato {len(links)} link ma hai chiesto il {link_number}°"
+            }
+    
+    # TYPE: Only use vision model for typing (needs to see where to type)
+    if 'scrivi' in command_lower or 'type' in command_lower or 'digita' in command_lower:
+        print("DEBUG: TYPE command - using vision model")
+        return analyze_with_vision_model(image, user_command, conversation_context)
+    
+    # Default: unknown command
+    return {
+        "action": "none",
+        "message": "Non ho capito cosa vuoi che faccia sullo schermo"
+    }
+
+
+def analyze_with_vision_model(image: Image.Image, user_command: str, conversation_context: str = "") -> dict:
+    """
+    Original vision model analysis - now used only for scroll/type, not for clicks.
     """
     
     if not OPENROUTER_API_KEY:
@@ -73,108 +375,27 @@ def analyze_screen_with_vision(image: Image.Image, user_command: str, conversati
 
     context_section = ""
     if conversation_context:
-        context_section = f"\n\nRecent conversation context:\n{conversation_context}\n"
+        context_section = f"\nContext: {conversation_context}\n"
 
-    prompt_text = f"""You are analyzing a Google search results page. Your task is to find SEARCH RESULT LINKS and click on them.
+    # MUCH SHORTER PROMPT - Vision models work better with concise instructions
+    prompt_text = f"""Analyze this screenshot (resolution: {width}x{height}).{context_section}
 
-Screen resolution: {width}x{height}{context_section}
+User command: "{user_command}"
 
-╔════════════════════════════════════════════════════════════════╗
-║  HOW GOOGLE SEARCH RESULTS LOOK - VISUAL STRUCTURE            ║
-╚════════════════════════════════════════════════════════════════╝
+Task:
+- For SCROLL: detect direction and amount
+- For TYPE: extract text to type (if command says "scrivi ciò", use context)
 
-A typical Google search result has this EXACT structure:
-
-┌─────────────────────────────────────────────────┐
-│ [Small Icon] BLUE CLICKABLE TITLE TEXT          │ ← THIS IS THE LINK! CLICK HERE!
-│              https://website.com › path          │ ← Green URL (smaller text)
-│              Brief description of the page...    │ ← Gray description text
-└─────────────────────────────────────────────────┘
-
-KEY VISUAL CHARACTERISTICS OF A REAL SEARCH RESULT LINK:
-1. ✓ Has a small circular favicon/icon on the left (16-20px)
-2. ✓ Large BLUE text title (the main clickable part)
-3. ✓ Title is usually 18-22px font size
-4. ✓ Below the blue title: GREEN URL text (smaller, 14px)
-5. ✓ Below the green URL: GRAY description snippet
-6. ✓ The blue title is the CLICKABLE area - click on it!
-7. ✓ Usually located in LEFT-CENTER of the screen
-8. ✓ Vertical spacing: about 60-100px between each result
-
-╔════════════════════════════════════════════════════════════════╗
-║  WHAT TO IGNORE (NOT SEARCH RESULTS)                          ║
-╚════════════════════════════════════════════════════════════════╝
-
-DO NOT click on these:
-✗ Top navigation bar (Web, Immagini, Video, Notizie, etc.)
-✗ "Le persone hanno chiesto anche" section (expandable questions with ▼)
-✗ "Altre domande" boxes
-✗ Video thumbnails or image galleries
-✗ Sidebar information boxes (usually on the right side)
-✗ Related searches at the bottom
-✗ Any section that doesn't have the [Icon] + Blue Title + Green URL structure
-
-╔════════════════════════════════════════════════════════════════╗
-║  STEP-BY-STEP: HOW TO FIND THE FIRST/SECOND/THIRD LINK        ║
-╚════════════════════════════════════════════════════════════════╝
-
-STEP 1: Scan the page from TOP to BOTTOM
-STEP 2: Look for the pattern: [Small Icon] BLUE TEXT with green URL below
-STEP 3: Find ALL search results that match this pattern
-STEP 4: Count them from top to bottom:
-        - First link = The FIRST blue title you find
-        - Second link = The SECOND blue title you find
-        - Third link = The THIRD blue title you find
-
-STEP 5: For the requested link, identify its position:
-        - Find where the blue title text starts (left edge)
-        - Find where the blue title text ends (right edge)
-        - Find the top of the blue title text
-        - Find the bottom of the blue title text
-
-STEP 6: Calculate CENTER coordinates:
-        x = (left_edge + right_edge) / 2
-        y = (top_edge + bottom_edge) / 2
-
-EXAMPLE:
-If the first search result blue title spans:
-- Horizontally: from x=195 to x=500
-- Vertically: from y=215 to y=240
-Then click at: x=347, y=227 (the center)
-
-╔════════════════════════════════════════════════════════════════╗
-║  TYPICAL PAGE LAYOUT (approximate Y coordinates)              ║
-╚════════════════════════════════════════════════════════════════╝
-
-y=0-100:    Google logo and search bar
-y=100-150:  Navigation tabs (Web, Immagini, Video...)
-y=150-250:  FIRST search result usually starts here
-y=250-350:  Might be FAQ section or second result
-y=350-450:  Another search result
-y=450-550:  Another search result
-... and so on
-
-Search results are typically in the LEFT portion of the screen:
-x=150-700:  Main content area where search results appear
-x=700-1200: Sidebar (knowledge panels, related info) - IGNORE THIS
-
-Your response MUST be this JSON:
+Return ONLY this JSON:
 {{
-    "action": "click" or "scroll" or "type" or "none",
-    "x": <INTEGER pixel x coordinate>,
-    "y": <INTEGER pixel y coordinate>,
-    "message": "Italian description",
-    "debug_info": "Example: Found first search result 'Vasco Rossi - Come Stai Lyrics' at icon position (195,220), title spans (220,215) to (520,240), clicking center at (370,227)"
+    "action": "scroll" or "type" or "none",
+    "direction": "up"/"down" (scroll only),
+    "amount": <pixels> (scroll only),
+    "text": "<text>" (type only),
+    "message": "Italian description"
 }}
 
-User command: {user_command}
-
-CRITICAL: 
-- Look for the [Icon] + BLUE TITLE + green url pattern
-- Click on the CENTER of the BLUE TITLE text
-- Count only real search results, ignore FAQ sections
-- Return ONLY the JSON object, nothing else
-"""
+Be concise and precise."""
 
     # Create message with image
     messages = [
